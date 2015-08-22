@@ -1,0 +1,78 @@
+---
+title: "Practical Machine Learning Course Project"
+output: html_document
+---
+
+## Human Activity Recognition
+
+Information about the data can be found at: <http://groupware.les.inf.puc-rio.br/har>
+
+The training data was obtained from: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
+
+The testing data can be found at: <https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+### Reading the training and testing data
+```{r}
+pml <- read.csv("pml-training.csv")
+pml_test <- read.csv("pml-testing.csv")
+```
+
+### Preparing the data sets
+
+Columns with NAs will be removed.
+```{r}
+pml_clean <- pml[,colSums(is.na(pml_test))==0]
+pml_test_clean <- pml_test[,colSums(is.na(pml_test))==0]
+```
+
+The first seven columns contain information like the user name etc., which cannot be used for the prediction, so I'll drop those columns as well.
+```{r}
+pml_clean <- pml_clean[,-c(1,2,3,4,5,6,7)]
+pml_test_clean <- pml_test_clean[,-c(1,2,3,4,5,6,7)]
+dim(pml)
+dim(pml_clean)
+```
+
+The reduced data set still contains `r dim(pml_clean)[1]` rows, but the number of variables for training is reduced to `r dim(pml_clean)[2]`.
+
+### Machine learning
+
+The data set is pretty large, so to facilitate training in reasonable time, I'll use half of the training data for training and the other half for validation.
+
+```{r}
+library(caret)
+set.seed(3433)
+inTrain = createDataPartition(pml_clean$classe, p = 1/2)[[1]]
+training = pml_clean[ inTrain,]
+testing = pml_clean[-inTrain,]
+```
+
+Using Random Forests for prediction:
+```{r}
+ctrl <- trainControl(method = "cv", number = 3)
+modelFit1 <- train(classe ~ ., data=training, method="rf", trControl = ctrl)
+print(modelFit1)
+```
+
+The instructions and grading rubrics differ a bit about what this report should contain.
+In the forums there is a discussion what is needed:
+<https://class.coursera.org/predmachlearn-031/forum/thread?thread_id=128>
+
+Accordingly, I'm using cross validation to pick the best set of parameters for the Random Forests. To determine the out of sample error, I apply the model to the validation set (half of the data), that I created at the beginning.
+
+```{r}
+testFit1 <- predict(modelFit1, newdata = testing)
+confusionMatrix(testFit1, testing$classe)
+```
+
+The accuracy is 0.9893, that looks good. 
+
+The actual prediction for the submission:
+```{r}
+rf_predict <- predict(modelFit1, newdata = pml_test_clean)
+print(rf_predict)
+source("pml_write_files.R")
+pml_write_files(rf_predict)
+```
+
+The submitted predictions are all correct, so I guess the model works reasonable well :).
